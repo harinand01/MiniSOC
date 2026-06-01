@@ -1,0 +1,52 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<div class="header">
+    <h1>Security Alerts</h1>
+</div>
+
+<div class="table-container">
+    <h3 style="margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Attack History</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>IP Address</th>
+                <th>Event</th>
+                <th>Verdict</th>
+                <th>Conf.</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody id="alerts-table">
+            <!-- Populated via script -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('/api/alerts/?verdict=ATTACK&page_size=50');
+        const data = await response.json();
+        const table = document.getElementById('alerts-table');
+        data.results.forEach(alert => {
+            const tr = document.createElement('tr');
+            const badgeClass = `verdict-${alert.verdict.toLowerCase()}`;
+            const timestamp = new Date(alert.timestamp).toLocaleString();
+            tr.innerHTML = `
+                <td>${timestamp}</td>
+                <td><a href="/dashboard/ip/${alert.ip_address}/" class="ip-link">${alert.ip_address}</a></td>
+                <td>${alert.event_type}</td>
+                <td><span class="verdict-badge ${badgeClass}">${alert.verdict}</span></td>
+                <td>${(alert.confidence * 100).toFixed(0)}%</td>
+                <td style="color: var(--text-secondary); font-size: 0.75rem;">${alert.reason}</td>
+            `;
+            table.appendChild(tr);
+        });
+    } catch (err) {
+        console.error(err);
+    }
+});
+</script>
+{% endblock %}

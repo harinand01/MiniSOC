@@ -1,0 +1,64 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<div class="header fade-in">
+    <h1>Security Overview</h1>
+    <div class="status-indicator">
+        <span class="dot"></span>
+        LIVE SYSTEM MONITORING
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card fade-in" style="animation-delay: 0.1s">
+        <div class="stat-label">Total Logs</div>
+        <div class="stat-value" id="stat-total-logs">0</div>
+    </div>
+    <div class="stat-card attack fade-in" style="animation-delay: 0.2s">
+        <div class="stat-label">Attacks (Today)</div>
+        <div class="stat-value" id="stat-attacks" style="color: var(--accent-red)">0</div>
+    </div>
+    <div class="stat-card suspicious fade-in" style="animation-delay: 0.3s">
+        <div class="stat-label">Suspicious (Today)</div>
+        <div class="stat-value" id="stat-suspicious" style="color: var(--accent-yellow)">0</div>
+    </div>
+    <div class="stat-card normal fade-in" style="animation-delay: 0.4s">
+        <div class="stat-label">Normal (Today)</div>
+        <div class="stat-value" id="stat-normal" style="color: var(--accent-green)">0</div>
+    </div>
+</div>
+
+<div class="chart-container fade-in" style="animation-delay: 0.5s">
+    <div class="table-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Attack Trend (Live)</h3>
+        <span style="font-size: 0.75rem; color: var(--text-secondary); font-weight: 600;">LAST 24 HOURS</span>
+    </div>
+    <div style="height: 280px; width: 100%;">
+        <canvas id="attackTrendChart"></canvas>
+    </div>
+</div>
+
+<div class="table-container fade-in" style="animation-delay: 0.6s">
+    <div class="table-header">
+        <h3 style="font-size: 1.1rem; font-weight: 700; color: var(--text-primary);">Live Analysis Feed</h3>
+        <div style="display: flex; gap: 0.5rem;">
+            <span class="verdict-badge" style="background: rgba(255,255,255,0.05); color: var(--text-secondary); border: 1px solid var(--border-color)">Real-time Stream</span>
+        </div>
+    </div>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>IP Address</th>
+                <th>Event</th>
+                <th>Verdict</th>
+                <th>Conf.</th>
+                <th>Reason</th>
+            </tr>
+        </thead>
+        <tbody id="live-feed">
+            <!-- Populated via WebSocket/JS -->
+        </tbody>
+    </table>
+</div>
+{% endblock %}

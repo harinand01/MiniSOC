@@ -1,0 +1,9 @@
+django
+djangorestframework
+psycopg2-binary
+python-dotenv
+channels
+channels-redis
+daphne
+kafka-python
+faker

@@ -1,0 +1,706 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    bgDark: '#080a0f',
+                    bgSurface: '#0f121a',
+                    cardBg: 'rgba(17, 24, 39, 0.7)',
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    accentPrimary: '#3b82f6',
+                    accentRed: '#f43f5e',
+                    accentGreen: '#10b981',
+                    accentYellow: '#f59e0b',
+                    accentPurple: '#8b5cf6',
+                }
+            }
+        }
+    }
+</script>
+
+<div class="space-y-6 text-white pb-10">
+    <!-- Header/Back Nav -->
+    <div class="flex justify-between items-center pb-4 border-b border-white/5">
+        <div>
+            <a href="{% url 'alerts' %}" class="text-xs text-accentPrimary hover:underline flex items-center gap-1.5 mb-1">
+                <i class="fas fa-arrow-left"></i> Back to Alerts
+            </a>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+                <span class="px-3 py-1 bg-white/5 rounded-xl border border-white/10 font-mono text-xl">{{ ip }}</span>
+                <span class="text-gray-400 font-normal">Investigation</span>
+            </h1>
+        </div>
+        <!-- Status Indicator -->
+        <div id="block-status-banner" class="px-4 py-2 rounded-xl border font-semibold text-sm transition-all duration-300 flex items-center gap-2">
+            <span class="h-2.5 w-2.5 rounded-full animate-pulse" id="status-dot"></span>
+            <span id="status-text">Checking Status...</span>
+        </div>
+    </div>
+
+    <!-- Main Grid Layout -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- COLUMN 1: Threat Intelligence & Action Center -->
+        <div class="space-y-6 lg:col-span-1">
+            <!-- Threat Score Card -->
+            <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Threat Level Risk Meter</h3>
+                <div class="flex flex-col items-center justify-center py-4">
+                    <!-- Circular Risk Gauge -->
+                    <div class="relative flex items-center justify-center h-36 w-36">
+                        <svg class="absolute transform -rotate-90 w-full h-full">
+                            <circle cx="72" cy="72" r="60" stroke="rgba(255,255,255,0.03)" stroke-width="8" fill="transparent" />
+                            <circle cx="72" cy="72" r="60" id="risk-circle" stroke="var(--accent-green)" stroke-dasharray="377" stroke-dashoffset="377" stroke-width="10" stroke-linecap="round" fill="transparent" class="transition-all duration-1000 ease-out" />
+                        </svg>
+                        <div class="text-center z-10">
+                            <span class="text-4xl font-black font-mono tracking-tighter" id="risk-percent">0%</span>
+                            <span class="block text-[10px] text-gray-500 font-semibold uppercase tracking-widest mt-0.5" id="risk-label">Low</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="text-xs text-gray-400 text-center mt-2" id="risk-explanation">
+                    No malicious behavior detected from this IP.
+                </div>
+            </div>
+
+            <!-- Geolocation & Whois Mockup -->
+            <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Threat Intelligence Lookup</h3>
+                <div class="space-y-3.5 text-sm">
+                    <div class="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span class="text-gray-500">Country</span>
+                        <span class="font-semibold flex items-center gap-1.5" id="intel-country"><i class="fas fa-earth-americas text-accentPrimary"></i> United States</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span class="text-gray-500">ISP</span>
+                        <span class="font-semibold" id="intel-isp">DigitalOcean LLC</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span class="text-gray-500">ASN</span>
+                        <span class="font-mono text-xs font-semibold" id="intel-asn">AS14061</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5 border-b border-white/5">
+                        <span class="text-gray-500">Hostname</span>
+                        <span class="font-mono text-xs text-accentPrimary truncate max-w-[180px]" id="intel-host">scan-host-04b.infra.net</span>
+                    </div>
+                    <div class="flex justify-between items-center py-1.5">
+                        <span class="text-gray-500">Proxy/VPN/Tor</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold border" id="intel-proxy">No</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Active Remediation Controls -->
+            <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl">
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Firewall Access Control</h3>
+                <div class="space-y-4">
+                    <button id="btn-toggle-block" onclick="handleBlockToggle()" class="w-full py-3 bg-accentRed hover:bg-rose-600 text-white rounded-xl font-bold text-sm transition-all duration-200 shadow-lg shadow-rose-500/10 flex items-center justify-center gap-2">
+                        <i class="fas fa-ban"></i> Block IP Address
+                    </button>
+                    <p class="text-xs text-gray-500 leading-relaxed text-center">
+                        Blocking this IP will drop all incoming requests at the rules engine boundary and assign an immediate critical attack verdict to future activity.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- COLUMN 2 & 3: Incident Management & Notes -->
+        <div class="space-y-6 lg:col-span-2">
+            
+            <!-- Escalation & Incident Management -->
+            <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl">
+                <div class="flex justify-between items-center mb-4">
+                    <div>
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Linked Security Incidents</h3>
+                        <p class="text-xs text-gray-500 mt-0.5">Active investigation cases associated with this IP</p>
+                    </div>
+                    <button onclick="openCreateIncidentModal()" class="px-3.5 py-1.5 bg-accentPrimary hover:bg-blue-600 text-white rounded-lg font-semibold text-xs transition-all flex items-center gap-1.5">
+                        <i class="fas fa-triangle-exclamation"></i> Escalate to Incident
+                    </button>
+                </div>
+                
+                <div class="space-y-3" id="incident-list-container">
+                    <!-- Dynamic incident lists -->
+                    <div class="p-8 text-center text-gray-500 text-sm">
+                        <i class="fas fa-shield text-xl mb-2 block text-gray-600"></i> No open security incidents linked to this IP.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Analyst Investigation Notes -->
+            <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl">
+                <div class="flex justify-between items-center mb-3">
+                    <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Local Investigation Log</h3>
+                    <span class="text-[10px] text-gray-500 font-semibold" id="notes-status">Auto-saved to browser</span>
+                </div>
+                <textarea id="analyst-notes" rows="6" oninput="saveLocalNotes()" placeholder="Type analysis logs, whois investigation notes, and remediation steps here..." class="w-full p-4 bg-black/40 border border-white/10 rounded-xl text-sm text-gray-200 placeholder-gray-600 focus:outline-none focus:border-accentPrimary transition-all duration-200 resize-none font-sans leading-relaxed"></textarea>
+                <div class="flex justify-between items-center mt-2.5">
+                    <button onclick="clearLocalNotes()" class="text-xs text-gray-500 hover:text-gray-300 transition-colors">Clear Notes</button>
+                    <button onclick="exportReport()" class="text-xs text-accentPrimary hover:underline flex items-center gap-1"><i class="fas fa-file-export"></i> Export Report</button>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ROW 3: Full Log Timeline -->
+    <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-white/5 mb-4">
+            <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Detailed Activity Logs</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Comprehensive audit trail of requests from this IP</p>
+            </div>
+            
+            <!-- Filters & Stats summary -->
+            <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                <select id="filter-verdict" onchange="filterLogs()" class="bg-black/40 border border-white/10 rounded-xl text-xs text-gray-300 px-3 py-2 focus:outline-none focus:border-accentPrimary transition-all">
+                    <option value="">All Verdicts</option>
+                    <option value="ATTACK">Attacks</option>
+                    <option value="SUSPICIOUS">Suspicious</option>
+                    <option value="NORMAL">Normal</option>
+                </select>
+                <select id="filter-event" onchange="filterLogs()" class="bg-black/40 border border-white/10 rounded-xl text-xs text-gray-300 px-3 py-2 focus:outline-none focus:border-accentPrimary transition-all">
+                    <option value="">All Event Types</option>
+                    <option value="login_failure">Login Failure</option>
+                    <option value="login_success">Login Success</option>
+                    <option value="api_access">API Access</option>
+                </select>
+                <span class="text-xs text-gray-400 font-mono bg-white/5 border border-white/5 px-3 py-1.5 rounded-xl" id="logs-count-badge">Total: 0</span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border-collapse">
+                <thead>
+                    <tr class="text-xs text-gray-500 uppercase tracking-wider border-b border-white/5">
+                        <th class="py-3 px-4 font-semibold">Time</th>
+                        <th class="py-3 px-4 font-semibold">Event Type</th>
+                        <th class="py-3 px-4 font-semibold">Username</th>
+                        <th class="py-3 px-4 font-semibold">Verdict</th>
+                        <th class="py-3 px-4 font-semibold">Confidence</th>
+                        <th class="py-3 px-4 font-semibold">Detection Reason</th>
+                    </tr>
+                </thead>
+                <tbody id="ip-logs-table" class="divide-y divide-white/5">
+                    <!-- Dynamic Logs rows populated via scripts -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: ESCALATE TO SECURITY INCIDENT        -->
+<!-- ========================================== -->
+<div id="escalate-modal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden text-white">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+            <h3 class="text-lg font-bold flex items-center gap-2 text-rose-500">
+                <i class="fas fa-triangle-exclamation"></i> Escalate IP to Security Incident
+            </h3>
+            <button onclick="closeCreateIncidentModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="incident-form" onsubmit="handleIncidentSubmit(event)" class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Incident Title</label>
+                <input type="text" id="inc-title" required class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Brute force / scanning detected from IP">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                <textarea id="inc-desc" required rows="3" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Details about this security threat..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Severity</label>
+                    <select id="inc-severity" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary">
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high" selected>High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Attack Type</label>
+                    <input type="text" id="inc-attack" required class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="brute_force">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Source IP</label>
+                    <input type="text" id="inc-ip" readonly class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-gray-400 focus:outline-none font-mono" value="{{ ip }}">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assigned investigator</label>
+                    <input type="text" id="inc-assigned" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Investigator Name">
+                </div>
+            </div>
+            <div class="pt-4 border-t border-white/5 flex justify-end gap-3">
+                <button type="button" onclick="closeCreateIncidentModal()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-semibold transition-all">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-accentPrimary hover:bg-blue-600 rounded-lg text-sm font-semibold text-white transition-all">Create Incident</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Simple Toast Notifications -->
+<div id="toast" class="fixed bottom-5 right-5 z-50 hidden transform translate-y-10 opacity-0 transition-all duration-300 ease-out bg-gray-900 border border-white/10 px-5 py-3 rounded-xl shadow-2xl text-sm flex items-center gap-2">
+    <i id="toast-icon" class="fas"></i>
+    <span id="toast-msg"></span>
+</div>
+
+<script>
+const ip = "{{ ip }}";
+let isBlocked = false;
+let allAlerts = [];
+let matchedIncidents = [];
+
+document.addEventListener('DOMContentLoaded', async () => {
+    // 1. Initial Data Fetching
+    await checkBlockStatus();
+    await fetchAlerts();
+    await fetchIncidents();
+    loadLocalNotes();
+    
+    // Setup Mock Threat Intelligence Info based on IP hashes
+    setupMockIntel();
+});
+
+// Setup Whois/Intel Mockup details based on IP value
+function setupMockIntel() {
+    const sum = ip.split('.').reduce((acc, val) => acc + parseInt(val || 0), 0);
+    const countries = [
+        { name: "United States", flag: "fa-earth-americas", label: "US" },
+        { name: "China", flag: "fa-earth-asia", label: "CN" },
+        { name: "Russia", flag: "fa-earth-europe", label: "RU" },
+        { name: "Germany", flag: "fa-earth-europe", label: "DE" },
+        { name: "Brazil", flag: "fa-earth-americas", label: "BR" }
+    ];
+    const isps = ["DigitalOcean LLC", "AWS Cloud Infrastructure", "Microsoft Azure", "Chinanet", "HostKey B.V."];
+    const hostnames = ["scanner.shadowserver.org", "botnet-node-45.onion", "crawler.censys.io", "api-gateway.ingress.net", "dynamic-ip.net"];
+    
+    const country = countries[sum % countries.length];
+    const isp = isps[(sum + 2) % isps.length];
+    const host = hostnames[(sum + 4) % hostnames.length];
+    const asn = `AS${10000 + (sum * 7) % 50000}`;
+    const proxy = (sum % 3 === 0) ? "Yes (TOR Exit)" : (sum % 5 === 0) ? "Yes (Proxy/VPN)" : "No";
+
+    document.getElementById('intel-country').innerHTML = `<i class="fas ${country.flag} text-accentPrimary"></i> ${country.name}`;
+    document.getElementById('intel-isp').innerText = isp;
+    document.getElementById('intel-asn').innerText = asn;
+    document.getElementById('intel-host').innerText = host;
+    
+    const proxyBadge = document.getElementById('intel-proxy');
+    proxyBadge.innerText = proxy;
+    if (proxy.startsWith("Yes")) {
+        proxyBadge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border-amber-500/20";
+    } else {
+        proxyBadge.className = "px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-gray-400 border-white/5";
+    }
+}
+
+// Check Block List Status from Backend
+async function checkBlockStatus() {
+    try {
+        const response = await fetch('/api/blocked-ips/');
+        if (!response.ok) throw new Error("Could not check blocked IPs list");
+        const data = await response.json();
+        
+        const blockMatch = data.find(item => item.ip_address === ip);
+        isBlocked = !!blockMatch;
+        updateBlockStatusUI();
+    } catch (err) {
+        console.error("Failed checking block status:", err);
+    }
+}
+
+function updateBlockStatusUI() {
+    const banner = document.getElementById('block-status-banner');
+    const dot = document.getElementById('status-dot');
+    const text = document.getElementById('status-text');
+    const btn = document.getElementById('btn-toggle-block');
+    
+    if (isBlocked) {
+        // IP Blocked styling
+        banner.className = "px-4 py-2 rounded-xl border bg-rose-500/10 text-rose-400 border-rose-500/20 font-semibold text-sm transition-all duration-300 flex items-center gap-2";
+        dot.className = "h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping";
+        text.innerText = "ACCESS BLOCKED";
+        
+        btn.innerHTML = `<i class="fas fa-lock-open"></i> Unblock IP Address`;
+        btn.className = "w-full py-3 bg-white/5 hover:bg-white/10 text-gray-200 border border-white/10 rounded-xl font-bold text-sm transition-all duration-200 flex items-center justify-center gap-2";
+    } else {
+        // IP Active styling
+        banner.className = "px-4 py-2 rounded-xl border bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-semibold text-sm transition-all duration-300 flex items-center gap-2";
+        dot.className = "h-2.5 w-2.5 rounded-full bg-emerald-500";
+        text.innerText = "ACCESS OPERATIONAL";
+        
+        btn.innerHTML = `<i class="fas fa-ban"></i> Block IP Address`;
+        btn.className = "w-full py-3 bg-accentRed hover:bg-rose-600 text-white rounded-xl font-bold text-sm transition-all duration-200 shadow-lg shadow-rose-500/10 flex items-center justify-center gap-2";
+    }
+    
+    calculateRiskScore();
+}
+
+// Block/Unblock Button Click
+async function handleBlockToggle() {
+    const token = getCsrfToken();
+    try {
+        if (isBlocked) {
+            // Call DELETE to unblock
+            const res = await fetch(`/api/blocked-ips/${ip}/`, {
+                method: "DELETE",
+                headers: {
+                    "X-CSRFToken": token
+                }
+            });
+            if (!res.ok) throw new Error("Failed to unblock IP address");
+            
+            showToast("IP address has been unblocked successfully.", "fa-lock-open", "text-emerald-400");
+            isBlocked = false;
+        } else {
+            // Call POST to block
+            const res = await fetch('/api/blocked-ips/', {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": token
+                },
+                body: JSON.stringify({
+                    ip_address: ip,
+                    reason: "Manual firewall block during IP investigation"
+                })
+            });
+            if (!res.ok) throw new Error("Failed to block IP address");
+            
+            showToast("IP address blacklisted and access blocked.", "fa-ban", "text-rose-500");
+            isBlocked = true;
+        }
+        updateBlockStatusUI();
+    } catch (err) {
+        showToast(err.message, "fa-circle-xmark", "text-rose-500");
+        console.error(err);
+    }
+}
+
+// Fetch Alerts for IP and Populate Table
+async function fetchAlerts() {
+    try {
+        // Note: Filters by 'ip' query parameter (which we added in alert_list API)
+        const response = await fetch(`/api/alerts/?ip=${ip}&page_size=200`);
+        if (!response.ok) throw new Error("Could not fetch alerts");
+        const data = await response.json();
+        
+        allAlerts = data.results || data;
+        
+        document.getElementById('logs-count-badge').innerText = `Total: ${allAlerts.length}`;
+        filterLogs();
+    } catch (err) {
+        console.error("Failed fetching alerts:", err);
+    }
+}
+
+// Filter and Render Logs Table
+function filterLogs() {
+    const verdictFilter = document.getElementById('filter-verdict').value;
+    const eventFilter = document.getElementById('filter-event').value;
+    
+    const filtered = allAlerts.filter(alert => {
+        const matchesVerdict = !verdictFilter || alert.verdict === verdictFilter;
+        const matchesEvent = !eventFilter || alert.event_type === eventFilter;
+        return matchesVerdict && matchesEvent;
+    });
+    
+    const table = document.getElementById('ip-logs-table');
+    table.innerHTML = "";
+    
+    if (filtered.length === 0) {
+        table.innerHTML = `
+            <tr>
+                <td colspan="6" class="p-8 text-center text-gray-500 text-sm">
+                    <i class="fas fa-inbox text-xl mb-2 block"></i> No records match the selected filters.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    filtered.forEach(alert => {
+        const tr = document.createElement('tr');
+        tr.className = "hover:bg-white/[0.01] transition-colors duration-150";
+        
+        const timestamp = new Date(alert.timestamp).toLocaleString();
+        
+        let badgeColor = "bg-emerald-500/10 text-emerald-400 border-emerald-500/25";
+        if (alert.verdict === 'ATTACK') badgeColor = "bg-rose-500/15 text-rose-400 border-rose-500/25";
+        else if (alert.verdict === 'SUSPICIOUS') badgeColor = "bg-amber-500/15 text-amber-400 border-amber-500/25";
+        
+        tr.innerHTML = `
+            <td class="py-3.5 px-4 font-mono text-xs text-gray-400">${timestamp}</td>
+            <td class="py-3.5 px-4 font-semibold text-gray-200 capitalize text-xs">${alert.event_type.replace('_', ' ')}</td>
+            <td class="py-3.5 px-4 text-gray-300 text-xs">${alert.username || '-'}</td>
+            <td class="py-3.5 px-4">
+                <span class="px-2 py-0.5 rounded text-[10px] font-extrabold border ${badgeColor}">
+                    ${alert.verdict}
+                </span>
+            </td>
+            <td class="py-3.5 px-4 font-mono text-xs text-gray-300">${(alert.confidence * 100).toFixed(0)}%</td>
+            <td class="py-3.5 px-4 text-xs text-gray-400 italic">${alert.reason || '-'}</td>
+        `;
+        table.appendChild(tr);
+    });
+    
+    calculateRiskScore();
+}
+
+// Calculate Risk Score Dynamically
+function calculateRiskScore() {
+    let score = 0;
+    
+    if (isBlocked) {
+        score = 100;
+    } else {
+        allAlerts.forEach(alert => {
+            if (alert.verdict === 'ATTACK') score += 20;
+            else if (alert.verdict === 'SUSPICIOUS') score += 5;
+        });
+        score = Math.min(score, 99); // Max 99 if not blocked
+    }
+    
+    // UI Update
+    document.getElementById('risk-percent').innerText = `${score}%`;
+    
+    const circle = document.getElementById('risk-circle');
+    const label = document.getElementById('risk-label');
+    const expl = document.getElementById('risk-explanation');
+    
+    // SVG DashOffset calculator (circle circumference is 2 * pi * r = 2 * 3.14159 * 60 = ~377)
+    const circumference = 377;
+    const offset = circumference - (score / 100) * circumference;
+    circle.style.strokeDashoffset = offset;
+    
+    if (score >= 80) {
+        circle.style.stroke = "var(--accent-red)";
+        label.innerText = "CRITICAL";
+        label.className = "block text-[10px] text-rose-500 font-bold uppercase tracking-widest mt-0.5";
+        expl.innerText = isBlocked ? "This host is actively blacklisted on the local firewall." : "High volume of attack signatures detected. immediate review suggested.";
+    } else if (score >= 40) {
+        circle.style.stroke = "var(--accent-yellow)";
+        label.innerText = "MEDIUM";
+        label.className = "block text-[10px] text-amber-500 font-bold uppercase tracking-widest mt-0.5";
+        expl.innerText = "Suspicious behavior logged. Threat intelligence indicates anomalies.";
+    } else {
+        circle.style.stroke = "var(--accent-green)";
+        label.innerText = "LOW";
+        label.className = "block text-[10px] text-emerald-500 font-bold uppercase tracking-widest mt-0.5";
+        expl.innerText = "Traffic characteristics are normal. Host is operational.";
+    }
+}
+
+// Fetch Linked Incidents
+async function fetchIncidents() {
+    try {
+        const response = await fetch('/api/incidents/?page_size=200');
+        if (!response.ok) throw new Error("Could not fetch incidents");
+        const data = await response.json();
+        
+        const list = data.results || data;
+        matchedIncidents = list.filter(inc => inc.source_ip === ip);
+        
+        const container = document.getElementById('incident-list-container');
+        container.innerHTML = "";
+        
+        if (matchedIncidents.length === 0) {
+            container.innerHTML = `
+                <div class="p-6 text-center text-gray-500 text-xs border border-white/5 rounded-xl bg-black/10">
+                    <i class="fas fa-shield text-xl mb-1.5 block text-gray-700"></i> No security incidents linked to this IP.
+                </div>
+            `;
+            return;
+        }
+        
+        matchedIncidents.forEach(inc => {
+            const row = document.createElement('div');
+            row.className = "p-4 border border-white/5 rounded-xl bg-black/20 hover:border-white/10 transition-all flex justify-between items-center";
+            
+            let statusClass = "bg-rose-500/10 text-rose-400 border-rose-500/20";
+            if (inc.status === 'in_progress') statusClass = "bg-amber-500/10 text-amber-400 border-amber-500/20";
+            else if (inc.status === 'closed') statusClass = "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
+            
+            let sevClass = "text-gray-400 border-white/5 bg-white/5";
+            if (inc.severity === 'critical') sevClass = "text-rose-500 border-rose-500/10 bg-rose-500/5 font-extrabold animate-pulse";
+            else if (inc.severity === 'high') sevClass = "text-orange-400 border-orange-500/10 bg-orange-500/5";
+            
+            row.innerHTML = `
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-mono font-bold text-accentPurple">#${inc.id}</span>
+                        <h4 class="text-sm font-semibold text-white truncate max-w-[280px]" title="${inc.title}">${inc.title}</h4>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1 max-w-[340px] truncate">${inc.description}</p>
+                </div>
+                <div class="flex items-center gap-2.5">
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${sevClass} capitalize">${inc.severity}</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-bold border ${statusClass} capitalize">${inc.status.replace('_', ' ')}</span>
+                    <a href="/incidents/" class="text-xs text-accentPrimary hover:underline font-semibold flex items-center gap-0.5">
+                        Manage <i class="fas fa-arrow-right text-[10px]"></i>
+                    </a>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    } catch (err) {
+        console.error("Failed fetching incidents:", err);
+    }
+}
+
+// Notes Logic (localStorage persistence)
+function saveLocalNotes() {
+    const text = document.getElementById('analyst-notes').value;
+    localStorage.setItem(`soc_notes_${ip}`, text);
+    
+    const status = document.getElementById('notes-status');
+    status.innerText = "Auto-saving...";
+    setTimeout(() => {
+        status.innerText = "All changes saved locally";
+    }, 800);
+}
+
+function loadLocalNotes() {
+    const text = localStorage.getItem(`soc_notes_${ip}`);
+    if (text) {
+        document.getElementById('analyst-notes').value = text;
+    }
+}
+
+function clearLocalNotes() {
+    if (confirm("Are you sure you want to clear your local notes for this IP?")) {
+        document.getElementById('analyst-notes').value = "";
+        localStorage.removeItem(`soc_notes_${ip}`);
+        showToast("Local notes cleared.", "fa-eraser", "text-gray-400");
+    }
+}
+
+// Export Findings
+function exportReport() {
+    const notes = document.getElementById('analyst-notes').value;
+    const statsStr = `IP Address: ${ip}\nStatus: ${isBlocked ? 'Blocked' : 'Active'}\nTotal Events Logs: ${allAlerts.length}\nRisk Score: ${document.getElementById('risk-percent').innerText}\nCountry: ${document.getElementById('intel-country').innerText}\nISP: ${document.getElementById('intel-isp').innerText}\nWhois Hostname: ${document.getElementById('intel-host').innerText}\nExport Timestamp: ${new Date().toLocaleString()}\n\nAnalyst Investigation Notes:\n===========================\n${notes || 'No notes recorded.'}`;
+    
+    const blob = new Blob([statsStr], { type: "text/plain;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `SOC_IP_Report_${ip}.txt`;
+    link.click();
+    showToast("Investigation report downloaded.", "fa-download", "text-emerald-400");
+}
+
+// Modal Actions: Escalate Incident
+function openCreateIncidentModal() {
+    // Determine dominant attack type for pre-population
+    let attackType = "brute_force";
+    const attackAlert = allAlerts.find(a => a.verdict === 'ATTACK');
+    if (attackAlert) {
+        attackType = attackAlert.attack_type;
+    }
+    
+    // Pre-populate fields
+    document.getElementById('inc-title').value = `Malicious Activity Investigation - ${ip}`;
+    document.getElementById('inc-desc').value = `Investigating recurring ${attackType.replace('_', ' ')} alerts detected from source IP address ${ip}. The host currently triggers ${allAlerts.length} events.`;
+    document.getElementById('inc-attack').value = attackType;
+    document.getElementById('escalate-modal').classList.remove('hidden');
+}
+
+function closeCreateIncidentModal() {
+    document.getElementById('escalate-modal').classList.add('hidden');
+}
+
+async function handleIncidentSubmit(e) {
+    e.preventDefault();
+    const token = getCsrfToken();
+    
+    const title = document.getElementById('inc-title').value;
+    const desc = document.getElementById('inc-desc').value;
+    const severity = document.getElementById('inc-severity').value;
+    const attack = document.getElementById('inc-attack').value;
+    const assigned = document.getElementById('inc-assigned').value;
+    
+    // Link all matching alert IDs
+    const alertIds = allAlerts.map(a => a.id);
+    
+    try {
+        const res = await fetch("/api/incidents/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": token
+            },
+            body: JSON.stringify({
+                title: title,
+                description: desc,
+                severity: severity,
+                status: "open",
+                source_ip: ip,
+                attack_type: attack,
+                assigned_to: assigned,
+                alert_ids: alertIds
+            })
+        });
+
+        if (!res.ok) throw new Error("Failed to create incident");
+        
+        closeCreateIncidentModal();
+        showToast("Incident created and alerts escalated.", "fa-shield-halved", "text-emerald-400");
+        
+        // Refresh incidents block
+        await fetchIncidents();
+    } catch (err) {
+        showToast(err.message, "fa-circle-xmark", "text-rose-500");
+        console.error(err);
+    }
+}
+
+// Helpers: CSRF & Toasts
+function getCsrfToken() {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, 10) === ('csrftoken' + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(10));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+function showToast(message, icon, colorClass) {
+    const toast = document.getElementById('toast');
+    const msgEl = document.getElementById('toast-msg');
+    const iconEl = document.getElementById('toast-icon');
+    
+    msgEl.innerText = message;
+    iconEl.className = `fas ${icon} ${colorClass}`;
+    
+    toast.classList.remove('hidden');
+    // Force reflow
+    toast.offsetHeight;
+    
+    // Slide up & fade in
+    toast.classList.remove('translate-y-10', 'opacity-0');
+    
+    setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 300);
+    }, 3500);
+}
+</script>
+{% endblock %}

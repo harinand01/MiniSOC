@@ -1,0 +1,47 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<div class="header">
+    <h1>All System Logs</h1>
+</div>
+
+<div class="table-container">
+    <h3 style="margin-bottom: 1rem; font-size: 1rem; font-weight: 600;">Event History</h3>
+    <table>
+        <thead>
+            <tr>
+                <th>Time</th>
+                <th>IP Address</th>
+                <th>Event</th>
+                <th>Username</th>
+            </tr>
+        </thead>
+        <tbody id="logs-table">
+            <!-- Populated via script -->
+        </tbody>
+    </table>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const response = await fetch('/api/logs/?page_size=100');
+        const data = await response.json();
+        const table = document.getElementById('logs-table');
+        data.results.forEach(log => {
+            const tr = document.createElement('tr');
+            const timestamp = new Date(log.timestamp).toLocaleString();
+            tr.innerHTML = `
+                <td>${timestamp}</td>
+                <td><a href="/dashboard/ip/${log.ip_address}/" class="ip-link">${log.ip_address}</a></td>
+                <td>${log.event_type}</td>
+                <td>${log.username}</td>
+            `;
+            table.appendChild(tr);
+        });
+    } catch (err) {
+        console.error(err);
+    }
+});
+</script>
+{% endblock %}

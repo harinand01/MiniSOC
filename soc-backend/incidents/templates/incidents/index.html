@@ -1,0 +1,677 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    bgDark: '#080a0f',
+                    bgSurface: '#0f121a',
+                    cardBg: 'rgba(17, 24, 39, 0.7)',
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    accentPrimary: '#3b82f6',
+                    accentRed: '#f43f5e',
+                    accentGreen: '#10b981',
+                    accentYellow: '#f59e0b',
+                    accentPurple: '#8b5cf6',
+                }
+            }
+        }
+    }
+</script>
+
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center pb-4 border-b border-white/5">
+        <div>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight">Incident Management</h1>
+            <p class="text-sm text-gray-400 mt-1">Investigate, track, and remediate security incidents</p>
+        </div>
+        <button onclick="openCreateModal()" class="px-4 py-2 bg-accentPrimary hover:bg-blue-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 shadow-lg shadow-blue-500/20 flex items-center gap-2">
+            <i class="fas fa-plus"></i> Create Incident
+        </button>
+    </div>
+
+    <!-- Summary Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Open Incidents -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1">
+            <div class="absolute top-0 left-0 w-full h-[4px] bg-accentRed"></div>
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">Open Incidents</div>
+            <div class="text-3xl font-extrabold text-accentRed mt-2 font-mono" id="stat-open">0</div>
+        </div>
+        <!-- In Progress -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1">
+            <div class="absolute top-0 left-0 w-full h-[4px] bg-accentYellow"></div>
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">In Progress</div>
+            <div class="text-3xl font-extrabold text-accentYellow mt-2 font-mono" id="stat-progress">0</div>
+        </div>
+        <!-- Closed -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1">
+            <div class="absolute top-0 left-0 w-full h-[4px] bg-accentGreen"></div>
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">Closed Incidents</div>
+            <div class="text-3xl font-extrabold text-accentGreen mt-2 font-mono" id="stat-closed">0</div>
+        </div>
+        <!-- Critical -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden transition-all duration-300 hover:-translate-y-1">
+            <div class="absolute top-0 left-0 w-full h-[4px] bg-accentPurple"></div>
+            <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">Critical Severity</div>
+            <div class="text-3xl font-extrabold text-accentPurple mt-2 font-mono" id="stat-critical">0</div>
+        </div>
+    </div>
+
+    <!-- Filters Row -->
+    <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-4 rounded-2xl flex flex-wrap gap-4 items-center justify-between">
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="relative flex-1 md:w-64">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                    <i class="fas fa-search text-xs"></i>
+                </span>
+                <input type="text" id="search-ip" placeholder="Filter by Source IP..." class="w-full pl-9 pr-4 py-2 bg-black/30 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-accentPrimary transition-all duration-200">
+            </div>
+            <select id="filter-severity" class="bg-black/30 border border-white/10 rounded-xl text-sm text-gray-300 px-3 py-2 focus:outline-none focus:border-accentPrimary transition-all duration-200">
+                <option value="">All Severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+            <select id="filter-status" class="bg-black/30 border border-white/10 rounded-xl text-sm text-gray-300 px-3 py-2 focus:outline-none focus:border-accentPrimary transition-all duration-200">
+                <option value="">All Statuses</option>
+                <option value="open">Open</option>
+                <option value="in_progress">In Progress</option>
+                <option value="closed">Closed</option>
+            </select>
+        </div>
+        <div class="text-xs text-gray-400 font-semibold" id="pagination-info">
+            Showing 0 incidents
+        </div>
+    </div>
+
+    <!-- Incidents Table Container -->
+    <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 rounded-2xl overflow-hidden shadow-xl">
+        <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="border-b border-white/5 bg-white/[0.01]">
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">ID</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Title</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Severity</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Status</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Source IP</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Attack Type</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Alerts</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider">Created At</th>
+                        <th class="p-4 text-xs font-bold text-gray-400 uppercase tracking-wider text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="incidents-list" class="divide-y divide-white/5">
+                    <!-- Dynamic Rows -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: VIEW DETAILS                        -->
+<!-- ========================================== -->
+<div id="details-modal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl overflow-hidden text-white">
+        <!-- Header -->
+        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+            <div>
+                <h3 class="text-xl font-bold flex items-center gap-2" id="detail-title">Incident Details</h3>
+                <span class="text-xs text-gray-400" id="detail-id">ID: 0</span>
+            </div>
+            <button onclick="closeDetailsModal()" class="text-gray-400 hover:text-white text-lg"><i class="fas fa-times"></i></button>
+        </div>
+        <!-- Body -->
+        <div class="p-6 overflow-y-auto space-y-6 flex-1">
+            <!-- Metadata Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 bg-black/20 p-4 rounded-xl border border-white/5">
+                <div>
+                    <span class="text-xs text-gray-500 block">Severity</span>
+                    <span id="detail-severity" class="inline-block mt-1"></span>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500 block">Status</span>
+                    <span id="detail-status" class="inline-block mt-1"></span>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500 block">Source IP</span>
+                    <a id="detail-ip" href="#" class="font-mono font-bold text-accentPrimary hover:underline block mt-1"></a>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500 block">Attack Type</span>
+                    <span id="detail-attack-type" class="font-semibold block mt-1"></span>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500 block">Assigned Investigator</span>
+                    <span id="detail-assigned" class="text-gray-300 block mt-1"></span>
+                </div>
+                <div>
+                    <span class="text-xs text-gray-500 block">Created / Updated</span>
+                    <span id="detail-times" class="text-xs text-gray-400 block mt-1"></span>
+                </div>
+            </div>
+
+            <!-- Description -->
+            <div>
+                <h4 class="text-sm font-bold uppercase text-gray-400 mb-2">Description</h4>
+                <div class="bg-black/20 p-4 rounded-xl border border-white/5 text-sm text-gray-300" id="detail-desc"></div>
+            </div>
+
+            <!-- Notes -->
+            <div>
+                <h4 class="text-sm font-bold uppercase text-gray-400 mb-2">Investigation Notes</h4>
+                <div class="bg-black/20 p-4 rounded-xl border border-white/5 text-sm text-gray-300 whitespace-pre-wrap" id="detail-notes">None</div>
+            </div>
+
+            <!-- Linked Alerts -->
+            <div>
+                <div class="flex justify-between items-center mb-2">
+                    <h4 class="text-sm font-bold uppercase text-gray-400">Linked Detection Alerts</h4>
+                    <button onclick="openLinkAlertForm()" class="text-xs bg-accentPrimary/20 hover:bg-accentPrimary/35 text-blue-400 px-2 py-1 rounded border border-blue-500/30">Link Alert</button>
+                </div>
+                <div class="overflow-x-auto border border-white/5 rounded-xl">
+                    <table class="w-full text-left text-xs bg-black/10">
+                        <thead>
+                            <tr class="bg-white/5 text-gray-400">
+                                <th class="p-3">Time</th>
+                                <th class="p-3">Verdict</th>
+                                <th class="p-3">Attack Type</th>
+                                <th class="p-3">Confidence</th>
+                                <th class="p-3">Reason</th>
+                            </tr>
+                        </thead>
+                        <tbody id="detail-alerts-table" class="divide-y divide-white/5">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: UPDATE STATUS                       -->
+<!-- ========================================== -->
+<div id="update-modal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden text-white">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+            <h3 class="text-lg font-bold">Update Incident Status</h3>
+            <button onclick="closeUpdateModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="update-form" onsubmit="handleUpdateSubmit(event)" class="p-6 space-y-4">
+            <input type="hidden" id="update-incident-id">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Incident Status</label>
+                <select id="update-status" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2.5 text-white focus:outline-none focus:border-accentPrimary">
+                    <option value="open">Open</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="closed">Closed</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Assigned Investigator</label>
+                <input type="text" id="update-assigned" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2.5 text-white focus:outline-none focus:border-accentPrimary" placeholder="Investigator Name">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Investigation Notes</label>
+                <textarea id="update-notes" rows="4" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2.5 text-white focus:outline-none focus:border-accentPrimary" placeholder="Enter status update, analysis steps, resolution details..."></textarea>
+            </div>
+            <div class="pt-4 border-t border-white/5 flex justify-end gap-3">
+                <button type="button" onclick="closeUpdateModal()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-semibold transition-all">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-accentPrimary hover:bg-blue-600 rounded-lg text-sm font-semibold text-white transition-all">Save Changes</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: MANUAL CREATE                       -->
+<!-- ========================================== -->
+<div id="create-modal" class="fixed inset-0 z-50 hidden bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden text-white">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+            <h3 class="text-lg font-bold">Create Security Incident</h3>
+            <button onclick="closeCreateModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="create-form" onsubmit="handleCreateSubmit(event)" class="p-6 space-y-4">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Incident Title</label>
+                <input type="text" id="create-title" required class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Brute force login detected from X">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Description</label>
+                <textarea id="create-desc" required rows="2" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Provide incident context..."></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Severity</label>
+                    <select id="create-severity" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary">
+                        <option value="low">Low</option>
+                        <option value="medium" selected>Medium</option>
+                        <option value="high">High</option>
+                        <option value="critical">Critical</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Status</label>
+                    <select id="create-status" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary">
+                        <option value="open" selected>Open</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Source IP</label>
+                    <input type="text" id="create-ip" required class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="192.168.1.1">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Attack Type</label>
+                    <input type="text" id="create-attack" required class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="brute_force">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Assigned Investigator</label>
+                <input type="text" id="create-assigned" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Name or Team">
+            </div>
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-1">Alert IDs (Comma-separated, optional)</label>
+                <input type="text" id="create-alert-ids" class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="12, 14, 15">
+            </div>
+            <div class="pt-4 border-t border-white/5 flex justify-end gap-3">
+                <button type="button" onclick="closeCreateModal()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-semibold transition-all">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-accentPrimary hover:bg-blue-600 rounded-lg text-sm font-semibold text-white transition-all">Create Incident</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- ========================================== -->
+<!-- MODAL: LINK EXIST ALERT                    -->
+<!-- ========================================== -->
+<div id="link-alert-modal" class="fixed inset-0 z-[60] hidden bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden text-white">
+        <div class="p-6 border-b border-white/5 flex justify-between items-center bg-white/[0.02]">
+            <h3 class="text-sm font-bold">Link Detection Alert to Incident</h3>
+            <button onclick="closeLinkAlertModal()" class="text-gray-400 hover:text-white"><i class="fas fa-times"></i></button>
+        </div>
+        <form id="link-alert-form" onsubmit="handleLinkAlertSubmit(event)" class="p-6 space-y-4">
+            <input type="hidden" id="link-incident-id">
+            <div>
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Alert ID to Link</label>
+                <input type="number" id="link-alert-id" required class="w-full bg-black/40 border border-white/10 rounded-xl text-sm px-4 py-2 text-white focus:outline-none focus:border-accentPrimary" placeholder="Enter alert ID (e.g. 45)">
+            </div>
+            <div class="pt-4 border-t border-white/5 flex justify-end gap-3">
+                <button type="button" onclick="closeLinkAlertModal()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm font-semibold transition-all">Cancel</button>
+                <button type="submit" class="px-4 py-2 bg-accentPrimary hover:bg-blue-600 rounded-lg text-sm font-semibold text-white transition-all font-semibold">Link Alert</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- JAVASCRIPT LOGIC -->
+<script>
+    let incidentsData = [];
+
+    // On Load
+    document.addEventListener("DOMContentLoaded", () => {
+        loadDashboardData();
+
+        // Listeners for Live filter
+        document.getElementById("search-ip").addEventListener("input", filterAndRender);
+        document.getElementById("filter-severity").addEventListener("change", filterAndRender);
+        document.getElementById("filter-status").addEventListener("change", filterAndRender);
+    });
+
+    async function loadDashboardData() {
+        try {
+            await fetchStats();
+            await fetchIncidents();
+        } catch (err) {
+            console.error("Error loading dashboard data:", err);
+        }
+    }
+
+    // Stats
+    async function fetchStats() {
+        const res = await fetch("/api/incidents/stats/");
+        const data = await res.json();
+        
+        document.getElementById("stat-open").textContent = data.by_status.open || 0;
+        document.getElementById("stat-progress").textContent = data.by_status.in_progress || 0;
+        document.getElementById("stat-closed").textContent = data.by_status.closed || 0;
+        document.getElementById("stat-critical").textContent = data.by_severity.critical || 0;
+    }
+
+    // Fetch Incidents
+    async function fetchIncidents() {
+        const res = await fetch("/api/incidents/?page_size=200");
+        const data = await res.json();
+        
+        // Handle DRF Paginated vs Unpaginated structure
+        incidentsData = data.results || data;
+        filterAndRender();
+    }
+
+    // Filter and Render Incidents
+    function filterAndRender() {
+        const searchIp = document.getElementById("search-ip").value.trim().toLowerCase();
+        const severity = document.getElementById("filter-severity").value;
+        const status = document.getElementById("filter-status").value;
+
+        const filtered = incidentsData.filter(incident => {
+            const matchesIp = !searchIp || incident.source_ip.toLowerCase().includes(searchIp);
+            const matchesSeverity = !severity || incident.severity === severity;
+            const matchesStatus = !status || incident.status === status;
+            return matchesIp && matchesSeverity && matchesStatus;
+        });
+
+        document.getElementById("pagination-info").textContent = `Showing ${filtered.length} of ${incidentsData.length} incidents`;
+
+        const tbody = document.getElementById("incidents-list");
+        tbody.innerHTML = "";
+
+        if (filtered.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="p-8 text-center text-gray-500 text-sm">
+                        <i class="fas fa-inbox text-2xl mb-2 block"></i> No incidents found matching the criteria.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        filtered.forEach(inc => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-white/[0.02] transition-colors duration-150 border-b border-white/5";
+
+            // Severity styling
+            let sevClass = "bg-green-500/10 text-green-400 border-green-500/20";
+            if (inc.severity === 'critical') sevClass = "bg-red-600/20 text-red-400 border-red-500/30 font-bold animate-pulse";
+            else if (inc.severity === 'high') sevClass = "bg-orange-500/10 text-orange-400 border-orange-500/20";
+            else if (inc.severity === 'medium') sevClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+
+            // Status styling
+            let statusClass = "bg-red-500/10 text-red-400 border-red-500/20";
+            if (inc.status === 'in_progress') statusClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+            else if (inc.status === 'closed') statusClass = "bg-green-500/10 text-green-400 border-green-500/20";
+
+            const createdAt = new Date(inc.created_at).toLocaleString();
+
+            tr.innerHTML = `
+                <td class="p-4 font-mono text-accentPurple font-bold text-sm">#${inc.id}</td>
+                <td class="p-4 font-semibold text-white text-sm max-w-[200px] truncate" title="${inc.title}">${inc.title}</td>
+                <td class="p-4">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${sevClass} capitalize">
+                        ${inc.severity}
+                    </span>
+                </td>
+                <td class="p-4">
+                    <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusClass} capitalize">
+                        ${inc.status.replace('_', ' ')}
+                    </span>
+                </td>
+                <td class="p-4 font-mono text-gray-300 text-sm">
+                    <a href="/dashboard/ip/${inc.source_ip}/" class="text-accentPrimary hover:underline">${inc.source_ip}</a>
+                </td>
+                <td class="p-4 text-gray-300 text-sm font-semibold">${inc.attack_type}</td>
+                <td class="p-4 font-mono text-gray-400 text-sm">${inc.alerts_count}</td>
+                <td class="p-4 text-gray-400 text-xs">${createdAt}</td>
+                <td class="p-4 text-right space-x-2">
+                    <button onclick="viewDetails(${inc.id})" class="px-2.5 py-1 bg-white/5 hover:bg-white/10 text-xs text-white border border-white/10 rounded-md font-semibold transition-all">View Details</button>
+                    <button onclick="openUpdateModal(${inc.id}, '${inc.status}', '${inc.assigned_to || ''}', \`${inc.investigation_notes || ''}\`)" class="px-2.5 py-1 bg-accentPrimary/10 hover:bg-accentPrimary/25 text-xs text-blue-400 border border-blue-500/20 rounded-md font-semibold transition-all">Update Status</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Modal Details Actions
+    async function viewDetails(id) {
+        try {
+            const res = await fetch(`/api/incidents/${id}/`);
+            if (!res.ok) throw new Error("Could not fetch details.");
+            const inc = await res.json();
+
+            document.getElementById("detail-title").textContent = inc.title;
+            document.getElementById("detail-id").textContent = `Incident ID: #${inc.id}`;
+            const detailIpEl = document.getElementById("detail-ip");
+            detailIpEl.textContent = inc.source_ip;
+            detailIpEl.href = `/dashboard/ip/${inc.source_ip}/`;
+            document.getElementById("detail-attack-type").textContent = inc.attack_type;
+            document.getElementById("detail-assigned").textContent = inc.assigned_to || "Unassigned";
+            document.getElementById("detail-desc").textContent = inc.description || "No description provided.";
+            document.getElementById("detail-notes").textContent = inc.investigation_notes || "No investigation notes recorded yet.";
+            
+            // Set link incident id reference
+            document.getElementById("link-incident-id").value = inc.id;
+
+            // Set timestamps
+            const created = new Date(inc.created_at).toLocaleString();
+            const updated = new Date(inc.updated_at).toLocaleString();
+            const resolved = inc.resolved_at ? new Date(inc.resolved_at).toLocaleString() : "Not Resolved";
+            document.getElementById("detail-times").innerHTML = `
+                Created: ${created}<br>
+                Updated: ${updated}<br>
+                Resolved: ${resolved}
+            `;
+
+            // Severity Badge
+            let sevClass = "bg-green-500/10 text-green-400 border-green-500/20";
+            if (inc.severity === 'critical') sevClass = "bg-red-600/20 text-red-400 border-red-500/30 font-bold animate-pulse";
+            else if (inc.severity === 'high') sevClass = "bg-orange-500/10 text-orange-400 border-orange-500/20";
+            else if (inc.severity === 'medium') sevClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+            document.getElementById("detail-severity").className = `px-2.5 py-0.5 rounded-full text-xs font-semibold border ${sevClass} capitalize`;
+            document.getElementById("detail-severity").textContent = inc.severity;
+
+            // Status Badge
+            let statusClass = "bg-red-500/10 text-red-400 border-red-500/20";
+            if (inc.status === 'in_progress') statusClass = "bg-yellow-500/10 text-yellow-400 border-yellow-500/20";
+            else if (inc.status === 'closed') statusClass = "bg-green-500/10 text-green-400 border-green-500/20";
+            document.getElementById("detail-status").className = `px-2.5 py-0.5 rounded-full text-xs font-semibold border ${statusClass} capitalize`;
+            document.getElementById("detail-status").textContent = inc.status.replace('_', ' ');
+
+            // Load Alerts
+            const alertsTable = document.getElementById("detail-alerts-table");
+            alertsTable.innerHTML = "";
+            
+            if (!inc.alerts || inc.alerts.length === 0) {
+                alertsTable.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="p-4 text-center text-gray-500">No linked detection alerts.</td>
+                    </tr>
+                `;
+            } else {
+                inc.alerts.forEach(alert => {
+                    const tr = document.createElement("tr");
+                    tr.className = "hover:bg-white/5";
+
+                    const alertTime = new Date(alert.created_at).toLocaleString();
+                    const conf = (alert.confidence * 100).toFixed(0) + "%";
+
+                    let badgeColor = "bg-green-500/10 text-green-400 border-green-500/25";
+                    if (alert.verdict === 'ATTACK') badgeColor = "bg-red-500/10 text-red-400 border-red-500/25";
+                    else if (alert.verdict === 'SUSPICIOUS') badgeColor = "bg-yellow-500/10 text-yellow-400 border-yellow-500/25";
+
+                    tr.innerHTML = `
+                        <td class="p-3 text-gray-400">${alertTime}</td>
+                        <td class="p-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">${alert.verdict}</span></td>
+                        <td class="p-3 font-semibold">${alert.attack_type}</td>
+                        <td class="p-3 font-mono">${conf}</td>
+                        <td class="p-3 text-gray-400 text-xs">${alert.reason}</td>
+                    `;
+                    alertsTable.appendChild(tr);
+                });
+            }
+
+            document.getElementById("details-modal").classList.remove("hidden");
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    function closeDetailsModal() {
+        document.getElementById("details-modal").classList.add("hidden");
+    }
+
+    // Modal Update Actions
+    function openUpdateModal(id, status, assigned, notes) {
+        document.getElementById("update-incident-id").value = id;
+        document.getElementById("update-status").value = status;
+        document.getElementById("update-assigned").value = assigned;
+        document.getElementById("update-notes").value = notes;
+        document.getElementById("update-modal").classList.remove("hidden");
+    }
+
+    function closeUpdateModal() {
+        document.getElementById("update-modal").classList.add("hidden");
+    }
+
+    async function handleUpdateSubmit(e) {
+        e.preventDefault();
+        const id = document.getElementById("update-incident-id").value;
+        const status = document.getElementById("update-status").value;
+        const assigned = document.getElementById("update-assigned").value;
+        const notes = document.getElementById("update-notes").value;
+
+        try {
+            const res = await fetch(`/api/incidents/${id}/`, {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCsrfToken()
+                },
+                body: JSON.stringify({
+                    status: status,
+                    assigned_to: assigned,
+                    investigation_notes: notes
+                })
+            });
+
+            if (!res.ok) throw new Error("Update failed.");
+            closeUpdateModal();
+            loadDashboardData();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // Create Modal Actions
+    function openCreateModal() {
+        document.getElementById("create-form").reset();
+        document.getElementById("create-modal").classList.remove("hidden");
+    }
+
+    function closeCreateModal() {
+        document.getElementById("create-modal").classList.add("hidden");
+    }
+
+    async function handleCreateSubmit(e) {
+        e.preventDefault();
+        const title = document.getElementById("create-title").value;
+        const desc = document.getElementById("create-desc").value;
+        const severity = document.getElementById("create-severity").value;
+        const status = document.getElementById("create-status").value;
+        const ip = document.getElementById("create-ip").value;
+        const attack = document.getElementById("create-attack").value;
+        const assigned = document.getElementById("create-assigned").value;
+        
+        const alertIdsText = document.getElementById("create-alert-ids").value.trim();
+        const alertIds = alertIdsText ? alertIdsText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n)) : [];
+
+        try {
+            const res = await fetch("/api/incidents/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCsrfToken()
+                },
+                body: JSON.stringify({
+                    title: title,
+                    description: desc,
+                    severity: severity,
+                    status: status,
+                    source_ip: ip,
+                    attack_type: attack,
+                    assigned_to: assigned,
+                    alert_ids: alertIds
+                })
+            });
+
+            if (!res.ok) throw new Error("Failed to create incident.");
+            closeCreateModal();
+            loadDashboardData();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // Link Alert Modal Actions
+    function openLinkAlertForm() {
+        document.getElementById("link-alert-form").reset();
+        document.getElementById("link-alert-modal").classList.remove("hidden");
+    }
+
+    function closeLinkAlertModal() {
+        document.getElementById("link-alert-modal").classList.add("hidden");
+    }
+
+    async function handleLinkAlertSubmit(e) {
+        e.preventDefault();
+        const incidentId = document.getElementById("link-incident-id").value;
+        const alertId = document.getElementById("link-alert-id").value;
+
+        try {
+            const res = await fetch(`/api/incidents/${incidentId}/link-alert/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCsrfToken()
+                },
+                body: JSON.stringify({
+                    alert_id: alertId
+                })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || "Failed to link alert.");
+            }
+            closeLinkAlertModal();
+            // Refresh detail view in background
+            viewDetails(incidentId);
+            loadDashboardData();
+        } catch (err) {
+            alert(err.message);
+        }
+    }
+
+    // Helper: CSRF Token
+    function getCsrfToken() {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, 10) === ('csrftoken' + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(10));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+</script>
+{% endblock %}

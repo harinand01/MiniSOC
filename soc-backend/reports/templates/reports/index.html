@@ -1,0 +1,497 @@
+{% extends 'dashboard/base.html' %}
+
+{% block content %}
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+    tailwind.config = {
+        darkMode: 'class',
+        theme: {
+            extend: {
+                colors: {
+                    bgDark: '#080a0f',
+                    bgSurface: '#0f121a',
+                    cardBg: 'rgba(17, 24, 39, 0.7)',
+                    borderColor: 'rgba(255, 255, 255, 0.08)',
+                    accentPrimary: '#3b82f6',
+                    accentRed: '#f43f5e',
+                    accentGreen: '#10b981',
+                    accentYellow: '#f59e0b',
+                    accentPurple: '#8b5cf6',
+                }
+            }
+        }
+    }
+</script>
+
+<div class="space-y-6 text-white pb-10">
+    <!-- Header Section -->
+    <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-white/5">
+        <div>
+            <h1 class="text-3xl font-extrabold text-white tracking-tight">Security Reports</h1>
+            <p class="text-sm text-gray-400 mt-1">Interactive security analytics, trends, and top IP metrics</p>
+        </div>
+        
+        <!-- Date Selector Buttons & Download -->
+        <div class="flex items-center gap-3 w-full md:w-auto">
+            <div class="inline-flex bg-black/40 p-1 rounded-xl border border-white/10" id="range-selector">
+                <button onclick="changeRange(1, this)" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-gray-400 hover:text-white">Today</button>
+                <button onclick="changeRange(7, this)" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-accentPrimary text-white shadow-lg shadow-blue-500/20">Last 7 Days</button>
+                <button onclick="changeRange(30, this)" class="px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-gray-400 hover:text-white">Last 30 Days</button>
+            </div>
+            <button onclick="exportCSV()" class="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-bold text-xs transition-all flex items-center gap-1.5">
+                <i class="fas fa-file-csv text-accentPrimary"></i> Download CSV
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <!-- Total Logs -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-xs text-gray-500 font-bold uppercase tracking-wider block">Logs Analyzed</span>
+                    <span class="text-2xl font-black font-mono block mt-1" id="summary-logs">0</span>
+                </div>
+                <div class="h-8 w-8 bg-blue-500/10 rounded-lg flex items-center justify-center border border-blue-500/20">
+                    <i class="fas fa-file-invoice text-accentPrimary text-xs"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Total Attacks -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-xs text-gray-500 font-bold uppercase tracking-wider block">Attacks Blocked</span>
+                    <span class="text-2xl font-black font-mono block mt-1 text-rose-500" id="summary-attacks">0</span>
+                </div>
+                <div class="h-8 w-8 bg-rose-500/10 rounded-lg flex items-center justify-center border border-rose-500/20">
+                    <i class="fas fa-shield-halved text-accentRed text-xs"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Total Incidents -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-xs text-gray-500 font-bold uppercase tracking-wider block">Incidents Escalated</span>
+                    <span class="text-2xl font-black font-mono block mt-1 text-amber-500" id="summary-incidents">0</span>
+                </div>
+                <div class="h-8 w-8 bg-amber-500/10 rounded-lg flex items-center justify-center border border-amber-500/20">
+                    <i class="fas fa-triangle-exclamation text-accentYellow text-xs"></i>
+                </div>
+            </div>
+        </div>
+        <!-- Detection Rate -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl relative overflow-hidden">
+            <div class="flex justify-between items-start">
+                <div>
+                    <span class="text-xs text-gray-500 font-bold uppercase tracking-wider block">Detection Rate</span>
+                    <span class="text-2xl font-black font-mono block mt-1 text-emerald-400" id="summary-rate">0.0%</span>
+                </div>
+                <div class="h-8 w-8 bg-emerald-500/10 rounded-lg flex items-center justify-center border border-emerald-500/20">
+                    <i class="fas fa-percent text-accentGreen text-xs"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Attack Type Breakdown (Bar) -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl lg:col-span-2">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Attacks by Type</h3>
+            <div class="h-64 relative">
+                <canvas id="chart-attack-types"></canvas>
+            </div>
+        </div>
+        <!-- Event Distribution (Pie) -->
+        <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl">
+            <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Event Distribution</h3>
+            <div class="h-64 relative flex items-center justify-center">
+                <canvas id="chart-verdicts"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row 2 -->
+    <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl">
+        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Attack Trend by Hour</h3>
+        <div class="h-64 relative">
+            <canvas id="chart-hourly-trend"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Attacking IPs Table -->
+    <div class="bg-gray-900/40 backdrop-blur-md border border-white/5 p-5 rounded-2xl">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Top Attacking IP Addresses</h3>
+                <p class="text-[10px] text-gray-500 mt-0.5">Most active host signatures during selected date range</p>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm border-collapse">
+                <thead>
+                    <tr class="text-xs text-gray-500 uppercase tracking-wider border-b border-white/5">
+                        <th class="py-3 px-4 font-semibold">Rank</th>
+                        <th class="py-3 px-4 font-semibold">IP Address</th>
+                        <th class="py-3 px-4 font-semibold">Total Attacks</th>
+                        <th class="py-3 px-4 font-semibold">Attack Type</th>
+                        <th class="py-3 px-4 font-semibold">First Seen</th>
+                        <th class="py-3 px-4 font-semibold">Last Seen</th>
+                        <th class="py-3 px-4 font-semibold text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="top-ips-table" class="divide-y divide-white/5">
+                    <!-- Loaded dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Simple Toast Notifications -->
+<div id="toast" class="fixed bottom-5 right-5 z-50 hidden transform translate-y-10 opacity-0 transition-all duration-300 ease-out bg-gray-900 border border-white/10 px-5 py-3 rounded-xl shadow-2xl text-sm flex items-center gap-2">
+    <i id="toast-icon" class="fas"></i>
+    <span id="toast-msg"></span>
+</div>
+
+<script>
+    let currentRangeDays = 7;
+    let currentRangeLabel = "Last 7 Days";
+    let currentData = null;
+
+    let barChart = null;
+    let pieChart = null;
+    let lineChart = null;
+
+    document.addEventListener("DOMContentLoaded", () => {
+        loadData(currentRangeDays);
+    });
+
+    async function loadData(days) {
+        try {
+            const res = await fetch(`/api/reports/summary/?days=${days}`);
+            if (!res.ok) throw new Error("Could not fetch reports data.");
+            
+            const data = await res.json();
+            currentData = data;
+
+            // 1. Update UI Counts
+            document.getElementById("summary-logs").textContent = data.total_logs.toLocaleString();
+            document.getElementById("summary-attacks").textContent = data.total_attacks.toLocaleString();
+            document.getElementById("summary-incidents").textContent = data.total_incidents.toLocaleString();
+            document.getElementById("summary-rate").textContent = data.detection_rate;
+
+            // 2. Render / Update Charts
+            renderAttackTypesChart(data.attack_type_breakdown);
+            renderVerdictsChart(data.total_attacks, data.total_suspicious, data.total_normal);
+            renderHourlyTrendChart(data.hourly_trend);
+
+            // 3. Render Top IPs table
+            renderTopIpsTable(data.top_attacking_ips);
+        } catch (err) {
+            console.error("Error fetching reports:", err);
+            showToast("Failed to fetch current report data.", "fa-triangle-exclamation", "text-rose-500");
+        }
+    }
+
+    function changeRange(days, buttonEl) {
+        currentRangeDays = days;
+        currentRangeLabel = days === 1 ? "Today" : `Last ${days} Days`;
+
+        // Style toggle
+        const container = document.getElementById("range-selector");
+        Array.from(container.children).forEach(btn => {
+            btn.className = "px-4 py-1.5 rounded-lg text-xs font-bold transition-all text-gray-400 hover:text-white";
+        });
+        buttonEl.className = "px-4 py-1.5 rounded-lg text-xs font-bold transition-all bg-accentPrimary text-white shadow-lg shadow-blue-500/20";
+
+        loadData(days);
+    }
+
+    // Chart 1: Bar Chart of Attack Types
+    function renderAttackTypesChart(breakdown) {
+        const ctx = document.getElementById("chart-attack-types");
+        if (!ctx) return;
+
+        // Clean names
+        const labels = breakdown.map(item => item.type.replace('_', ' ').toUpperCase());
+        const counts = breakdown.map(item => item.count);
+        
+        const colors = [
+            'rgba(244, 63, 94, 0.75)', // accentRed
+            'rgba(139, 92, 246, 0.75)', // accentPurple
+            'rgba(245, 158, 11, 0.75)', // accentYellow
+            'rgba(59, 130, 246, 0.75)', // accentPrimary
+        ];
+        const borderColors = [
+            '#f43f5e',
+            '#8b5cf6',
+            '#f59e0b',
+            '#3b82f6',
+        ];
+
+        if (barChart) barChart.destroy();
+
+        barChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels.length ? labels : ['NO DATA'],
+                datasets: [{
+                    label: 'Count',
+                    data: counts.length ? counts : [0],
+                    backgroundColor: labels.length ? colors.slice(0, labels.length) : ['rgba(255, 255, 255, 0.05)'],
+                    borderColor: labels.length ? borderColors.slice(0, labels.length) : ['rgba(255, 255, 255, 0.1)'],
+                    borderWidth: 1.5,
+                    borderRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#9ca3af', font: { family: 'Inter' } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#9ca3af', font: { family: 'Inter' } }
+                    }
+                }
+            }
+        });
+    }
+
+    // Chart 2: Verdicts Distribution (Pie)
+    function renderVerdictsChart(attacks, suspicious, normal) {
+        const ctx = document.getElementById("chart-verdicts");
+        if (!ctx) return;
+
+        if (pieChart) pieChart.destroy();
+
+        const hasData = (attacks + suspicious + normal) > 0;
+
+        pieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['ATTACK', 'SUSPICIOUS', 'NORMAL'],
+                datasets: [{
+                    data: hasData ? [attacks, suspicious, normal] : [0, 0, 1],
+                    backgroundColor: hasData ? [
+                        '#f43f5e', // accentRed
+                        '#f59e0b', // accentYellow
+                        '#10b981'  // accentGreen
+                    ] : ['rgba(255,255,255,0.05)'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#9ca3af',
+                            font: { family: 'Inter', size: 10 },
+                            boxWidth: 10,
+                            padding: 12
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Chart 3: Hourly Trend (Line)
+    function renderHourlyTrendChart(trend) {
+        const ctx = document.getElementById("chart-hourly-trend");
+        if (!ctx) return;
+
+        if (lineChart) lineChart.destroy();
+
+        const labels = trend.map(item => `${item.hour}:00`);
+        const attacks = trend.map(item => item.attacks);
+        const total = trend.map(item => item.total);
+
+        lineChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Attacks',
+                        data: attacks,
+                        borderColor: '#f43f5e',
+                        backgroundColor: 'rgba(244, 63, 94, 0.05)',
+                        borderWidth: 2,
+                        tension: 0.35,
+                        fill: true
+                    },
+                    {
+                        label: 'Total Logs',
+                        data: total,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.02)',
+                        borderWidth: 2,
+                        tension: 0.35,
+                        fill: true,
+                        hidden: true // Hidden by default, can be toggled by user in legend
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        labels: { color: '#9ca3af', font: { family: 'Inter', size: 11 } }
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#9ca3af', font: { family: 'Inter' } }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#9ca3af', font: { family: 'Inter', size: 9 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // Render Table Rows
+    function renderTopIpsTable(ips) {
+        const table = document.getElementById("top-ips-table");
+        table.innerHTML = "";
+
+        if (ips.length === 0) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="7" class="p-8 text-center text-gray-500 text-sm">
+                        <i class="fas fa-inbox text-2xl mb-2 block"></i> No attack logs logged in this date range.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        ips.forEach((ip, idx) => {
+            const tr = document.createElement("tr");
+            tr.className = "hover:bg-white/[0.01] transition-colors duration-150";
+
+            const firstSeen = ip.first_seen ? new Date(ip.first_seen).toLocaleString() : '-';
+            const lastSeen = ip.last_seen ? new Date(ip.last_seen).toLocaleString() : '-';
+
+            tr.innerHTML = `
+                <td class="py-3.5 px-4 font-mono font-bold text-gray-400 text-xs">#${idx + 1}</td>
+                <td class="py-3.5 px-4 font-mono font-bold text-gray-200">${ip.ip_address}</td>
+                <td class="py-3.5 px-4 font-mono text-rose-400 font-bold">${ip.total_attacks}</td>
+                <td class="py-3.5 px-4 font-semibold text-gray-300 capitalize text-xs">${ip.attack_type.replace('_', ' ')}</td>
+                <td class="py-3.5 px-4 text-xs text-gray-500">${firstSeen}</td>
+                <td class="py-3.5 px-4 text-xs text-gray-500">${lastSeen}</td>
+                <td class="py-3.5 px-4 text-right">
+                    <a href="/dashboard/ip/${ip.ip_address}/" class="px-3 py-1 bg-accentPrimary/10 hover:bg-accentPrimary/25 text-xs text-blue-400 border border-blue-500/20 rounded-md font-semibold transition-all">
+                        Investigate
+                    </a>
+                </td>
+            `;
+            table.appendChild(tr);
+        });
+    }
+
+    // Download CSV Action
+    function exportCSV() {
+        if (!currentData) {
+            showToast("No data available to download.", "fa-circle-xmark", "text-rose-500");
+            return;
+        }
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        // Header
+        csvContent += `SOC Security Report - Generated on ${new Date().toLocaleString()}\n`;
+        csvContent += `Selected Date Range,${currentRangeLabel}\n\n`;
+        
+        // Summary Card totals
+        csvContent += "SUMMARY METRICS\n";
+        csvContent += "Metric,Value\n";
+        csvContent += `Total Logs Analyzed,${currentData.total_logs}\n`;
+        csvContent += `Total Attacks Detected,${currentData.total_attacks}\n`;
+        csvContent += `Total Incidents Created,${currentData.total_incidents}\n`;
+        csvContent += `Detection Rate,${currentData.detection_rate}\n\n`;
+        
+        // Top attacking IPs
+        csvContent += "TOP ATTACKING IPS\n";
+        csvContent += "IP Address,Total Attacks,Dominant Attack Type,First Seen,Last Seen\n";
+        currentData.top_attacking_ips.forEach(ip => {
+            csvContent += `${ip.ip_address},${ip.total_attacks},${ip.attack_type},"${ip.first_seen || '-'}","${ip.last_seen || '-'}"\n`;
+        });
+        csvContent += "\n";
+        
+        // Attack type breakdown
+        csvContent += "ATTACK TYPE BREAKDOWN\n";
+        csvContent += "Attack Type,Count,Percentage\n";
+        currentData.attack_type_breakdown.forEach(item => {
+            csvContent += `${item.type},${item.count},${item.percentage}%\n`;
+        });
+        csvContent += "\n";
+        
+        // Hourly trend
+        csvContent += "HOURLY TREND\n";
+        csvContent += "Hour,Attacks,Total Logs\n";
+        currentData.hourly_trend.forEach(item => {
+            csvContent += `${item.hour}:00,${item.attacks},${item.total}\n`;
+        });
+        
+        // Trigger download
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        const dateStr = new Date().toISOString().split('T')[0];
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `soc-report-${dateStr}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showToast("CSV Report downloaded successfully.", "fa-circle-check", "text-emerald-400");
+    }
+
+    // Helper: Toast Notifications
+    function showToast(message, icon, colorClass) {
+        const toast = document.getElementById('toast');
+        const msgEl = document.getElementById('toast-msg');
+        const iconEl = document.getElementById('toast-icon');
+        
+        msgEl.innerText = message;
+        iconEl.className = `fas ${icon} ${colorClass}`;
+        
+        toast.classList.remove('hidden');
+        toast.offsetHeight; // Force reflow
+        
+        toast.classList.remove('translate-y-10', 'opacity-0');
+        
+        setTimeout(() => {
+            toast.classList.add('translate-y-10', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 300);
+        }, 3500);
+    }
+</script>
+{% endblock %}

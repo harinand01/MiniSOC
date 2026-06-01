@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mini SOC | Security Operations Center</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'dashboard/css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="logo">
+            <i class="fas fa-shield-halved"></i>
+            <span>MINI SOC</span>
+        </div>
+        <ul class="nav-links">
+            <li>
+                <a href="{% url 'index' %}" class="{% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'alerts' %}" class="{% if request.resolver_match.url_name == 'alerts' %}active{% endif %}">
+                    <i class="fas fa-bell"></i> Alerts
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'logs' %}" class="{% if request.resolver_match.url_name == 'logs' %}active{% endif %}">
+                    <i class="fas fa-list"></i> Logs
+                </a>
+            </li>
+            <li>
+                <a href="/incidents/" class="{% if 'incidents' in request.path %}active{% endif %}">
+                    <i class="fas fa-triangle-exclamation"></i> Incidents
+                </a>
+            </li>
+            <li>
+                <a href="{% url 'reports_index' %}" class="{% if 'reports' in request.path %}active{% endif %}">
+                    <i class="fas fa-chart-pie"></i> Reports
+                </a>
+            </li>
+        </ul>
+        <div style="margin-top: auto; padding: 1rem; color: var(--text-secondary); font-size: 0.75rem;">
+            <p>System Status: <span style="color: var(--accent-green)">Operational</span></p>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <script src="{% static 'dashboard/js/dashboard.js' %}"></script>
+</body>
+</html>
