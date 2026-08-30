@@ -12,5 +12,6 @@ urlpatterns = [
     path("stats/",                 views.stats,             name="stats"),
     path("blocked-ips/",           views.blocked_ip_list_create, name="blocked-ip-list-create"),
     path("blocked-ips/<str:ip_address>/", views.blocked_ip_delete, name="blocked-ip-delete"),
+    path("logs/notes/",            views.ip_notes,          name="ip-notes"),
 ]
 

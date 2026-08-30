@@ -37,10 +37,12 @@ def analyze(log_data: dict) -> dict:
     ip = log_data.get("ip_address", "0.0.0.0")
     failed_attempts = int(log_data.get("failed_attempts", 0))
 
-    # Dynamic Blocked IP Database Check (with safe fallback for standalone tests)
+    # Dynamic Blocked IP Database Check
+    db_checked = False
     try:
         from django.apps import apps
         if apps.ready:
+            db_checked = True
             from logs.models import BlockedIP
             if BlockedIP.objects.filter(ip_address=ip).exists():
                 return {
@@ -52,15 +54,15 @@ def analyze(log_data: dict) -> dict:
     except Exception:
         pass
 
-    # Rule 1: Blacklisted IP Detection
-    if ip in BLACKLISTED_IPS:
-
-        return {
-            "verdict": "ATTACK",
-            "attack_type": "blacklisted_ip",
-            "confidence": 1.0,
-            "reason": f"IP {ip} matches known threat intelligence blacklist",
-        }
+    # Rule 1: Blacklisted IP Detection (Only fallback if DB check was not performed)
+    if not db_checked:
+        if ip in BLACKLISTED_IPS:
+            return {
+                "verdict": "ATTACK",
+                "attack_type": "blacklisted_ip",
+                "confidence": 1.0,
+                "reason": f"IP {ip} matches known threat intelligence blacklist",
+            }
 
     # Rule 2: Brute Force Detection
     if failed_attempts > 5:

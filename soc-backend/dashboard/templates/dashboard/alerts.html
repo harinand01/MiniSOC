@@ -10,11 +10,13 @@
     <table>
         <thead>
             <tr>
-                <th>Time</th>
+                <th>First Seen</th>
+                <th>Last Seen</th>
+                <th>Duration</th>
                 <th>IP Address</th>
-                <th>Event</th>
-                <th>Verdict</th>
-                <th>Conf.</th>
+                <th>Attack Type</th>
+                <th>Count</th>
+                <th>Status</th>
                 <th>Reason</th>
             </tr>
         </thead>
@@ -25,6 +27,29 @@
 </div>
 
 <script>
+const ATTACK_TYPE_LABELS = {
+    'credential_stuffing': 'Credential Stuffing',
+    'brute_force': 'Brute Force',
+    'sql_injection': 'SQL Injection',
+    'blacklisted_ip': 'Blacklisted IP',
+    'suspicious_login': 'Suspicious Login',
+    'none': 'None'
+};
+
+function formatAttackType(type) {
+    return ATTACK_TYPE_LABELS[type] || type || '';
+}
+
+function formatDuration(firstSeen, lastSeen) {
+    if (!firstSeen || !lastSeen) return '-';
+    const diffMs = new Date(lastSeen) - new Date(firstSeen);
+    const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+    if (diffSecs === 0) return '< 1s';
+    const mins = Math.floor(diffSecs / 60);
+    const secs = diffSecs % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         const response = await fetch('/api/alerts/?verdict=ATTACK&page_size=50');
@@ -33,13 +58,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         data.results.forEach(alert => {
             const tr = document.createElement('tr');
             const badgeClass = `verdict-${alert.verdict.toLowerCase()}`;
-            const timestamp = new Date(alert.timestamp).toLocaleString();
+            const firstSeen = alert.first_seen ? new Date(alert.first_seen).toLocaleString() : new Date(alert.timestamp).toLocaleString();
+            const lastSeen = alert.last_seen ? new Date(alert.last_seen).toLocaleString() : new Date(alert.timestamp).toLocaleString();
+            const duration = formatDuration(alert.first_seen || alert.timestamp, alert.last_seen || alert.timestamp);
+            
+            const statusClass = alert.status === 'active' ? 'status-active' : 'status-resolved';
+            const statusLabel = alert.status || 'resolved';
+
             tr.innerHTML = `
-                <td>${timestamp}</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent-purple);">${firstSeen}</td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: var(--accent-purple);">${lastSeen}</td>
+                <td style="font-size: 0.85rem; font-weight: 500;">${duration}</td>
                 <td><a href="/dashboard/ip/${alert.ip_address}/" class="ip-link">${alert.ip_address}</a></td>
-                <td>${alert.event_type}</td>
-                <td><span class="verdict-badge ${badgeClass}">${alert.verdict}</span></td>
-                <td>${(alert.confidence * 100).toFixed(0)}%</td>
+                <td style="white-space: nowrap;"><span class="verdict-badge ${badgeClass}">${formatAttackType(alert.attack_type)}</span></td>
+                <td style="font-family: 'JetBrains Mono', monospace; font-weight: 700; text-align: center;">${alert.attack_count}</td>
+                <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
                 <td style="color: var(--text-secondary); font-size: 0.75rem;">${alert.reason}</td>
             `;
             table.appendChild(tr);

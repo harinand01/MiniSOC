@@ -1,8 +1,11 @@
-document.addEventListener('DOMContentLoaded', () => {
-    initDashboard();
-});
+(function() {
+    document.addEventListener('DOMContentLoaded', () => {
+        if (document.getElementById('stat-total-logs')) {
+            initDashboard();
+        }
+    });
 
-let alertChart;
+    let alertChart;
 
 function initDashboard() {
     // 1. Initial Data Fetch
@@ -72,13 +75,34 @@ function handleLiveAlert(alert) {
     // Add to feed
     const feed = document.getElementById('live-feed');
     if (feed) {
-        const row = createAlertRow(alert);
-        row.classList.add('new-event'); // Add highlight animation
-        feed.prepend(row);
-        
-        // Keep only last 20 rows
-        if (feed.children.length > 20) {
-            feed.removeChild(feed.lastChild);
+        let existingRow = null;
+        if (alert.verdict === 'ATTACK' || alert.verdict === 'SUSPICIOUS') {
+            // Find existing row by IP address and verdict to correlate live updates in feed
+            existingRow = Array.from(feed.children).find(row => {
+                const link = row.querySelector('.ip-link');
+                const verdictBadge = row.querySelector('.verdict-badge');
+                return link && link.innerText === alert.ip_address && verdictBadge && verdictBadge.innerText.startsWith(alert.verdict);
+            });
+        }
+
+        const newRow = createAlertRow(alert);
+
+        if (existingRow) {
+            // Update the existing row in-place
+            existingRow.innerHTML = newRow.innerHTML;
+            existingRow.className = newRow.className;
+            existingRow.classList.remove('new-event');
+            // Force reflow for CSS animation restart
+            void existingRow.offsetWidth;
+            existingRow.classList.add('new-event');
+        } else {
+            newRow.classList.add('new-event');
+            feed.prepend(newRow);
+            
+            // Keep only last 20 rows
+            if (feed.children.length > 20) {
+                feed.removeChild(feed.lastChild);
+            }
         }
     }
 
@@ -102,19 +126,40 @@ function updateStatsCounter(verdict) {
     if (target) target.innerText = (parseInt(target.innerText.replace(/,/g, '')) + 1).toLocaleString();
 }
 
+function formatDuration(firstSeen, lastSeen) {
+    if (!firstSeen || !lastSeen) return '-';
+    const diffMs = new Date(lastSeen) - new Date(firstSeen);
+    const diffSecs = Math.max(0, Math.floor(diffMs / 1000));
+    if (diffSecs === 0) return '< 1s';
+    const mins = Math.floor(diffSecs / 60);
+    const secs = diffSecs % 60;
+    return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
+
 function createAlertRow(alert) {
     const tr = document.createElement('tr');
     
     const badgeClass = `verdict-${alert.verdict.toLowerCase()}`;
     const timestamp = new Date(alert.timestamp).toLocaleTimeString([], { hour12: false });
 
+    let verdictText = alert.verdict;
+    if ((alert.verdict === 'ATTACK' || alert.verdict === 'SUSPICIOUS') && alert.attack_count > 1) {
+        verdictText += ` (x${alert.attack_count})`;
+    }
+
+    let reasonText = alert.reason;
+    if (alert.first_seen && alert.last_seen && alert.attack_count > 1) {
+        const duration = formatDuration(alert.first_seen, alert.last_seen);
+        reasonText += ` [Duration: ${duration}]`;
+    }
+
     tr.innerHTML = `
         <td>${timestamp}</td>
         <td><a href="/dashboard/ip/${alert.ip_address}/" class="ip-link">${alert.ip_address}</a></td>
         <td>${alert.event_type}</td>
-        <td><span class="verdict-badge ${badgeClass}">${alert.verdict}</span></td>
+        <td><span class="verdict-badge ${badgeClass}">${verdictText}</span></td>
         <td>${(alert.confidence * 100).toFixed(0)}%</td>
-        <td style="color: var(--text-secondary); font-size: 0.8rem; font-style: italic;">${alert.reason}</td>
+        <td style="color: var(--text-secondary); font-size: 0.8rem; font-style: italic;">${reasonText}</td>
     `;
     return tr;
 }
@@ -157,3 +202,4 @@ function updateChartData(verdict) {
     alertChart.data.datasets[0].data.push(lastValue + 1);
     alertChart.update();
 }
+})();

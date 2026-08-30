@@ -1,5 +1,4 @@
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
 
 def index(request):
     return render(request, 'dashboard/index.html')
@@ -12,3 +11,4 @@ def logs(request):
 
 def ip_investigation(request, ip):
     return render(request, 'dashboard/ip_investigation.html', {'ip': ip})
+

@@ -6,6 +6,7 @@ from logs.models import Alert
 class IncidentSerializer(serializers.ModelSerializer):
     alerts = AlertSerializer(many=True, read_only=True)
     alerts_count = serializers.IntegerField(source='alerts.count', read_only=True)
+    attack_count = serializers.SerializerMethodField()
     alert_ids = serializers.ListField(
         child=serializers.IntegerField(),
         write_only=True,
@@ -16,10 +17,13 @@ class IncidentSerializer(serializers.ModelSerializer):
         model = Incident
         fields = [
             'id', 'title', 'description', 'severity', 'status', 
-            'source_ip', 'attack_type', 'alerts', 'alerts_count',
-            'alert_ids', 'assigned_to', 'investigation_notes',
+            'source_ip', 'attack_type', 'alerts', 'alerts_count', 'attack_count',
+            'alert_ids', 'assigned_to', 'compromise_detected', 'investigation_notes',
             'created_at', 'updated_at', 'resolved_at'
         ]
+
+    def get_attack_count(self, obj):
+        return sum(alert.attack_count for alert in obj.alerts.all())
 
     def create(self, validated_data):
         alert_ids = validated_data.pop('alert_ids', [])

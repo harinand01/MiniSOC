@@ -338,3 +338,33 @@ td:last-child { border-right: 1px solid var(--border-color); border-radius: 0 12
 .new-event {
     animation: highlight 2s ease-out;
 }
+
+/* Status Badge Styling for Correlated Alerts */
+.status-badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: inline-block;
+}
+
+.status-active {
+    background: rgba(244, 63, 94, 0.15);
+    color: #fb7185;
+    border: 1px solid rgba(244, 63, 94, 0.3);
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.15);
+    animation: active-pulse 2s infinite;
+}
+
+.status-resolved {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+@keyframes active-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}

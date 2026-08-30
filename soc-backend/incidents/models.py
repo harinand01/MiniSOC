@@ -23,6 +23,7 @@ class Incident(models.Model):
     attack_type = models.CharField(max_length=100)
     alerts = models.ManyToManyField(Alert, related_name='incidents')
     assigned_to = models.CharField(max_length=100, blank=True, default='')
+    compromise_detected = models.BooleanField(default=False)
     investigation_notes = models.TextField(blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

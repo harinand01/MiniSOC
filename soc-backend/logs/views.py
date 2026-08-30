@@ -20,8 +20,8 @@ from rest_framework.decorators import api_view
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
-from .models import Alert, Log, BlockedIP
-from .serializers import AlertSerializer, LogSerializer, BlockedIPSerializer
+from .models import Alert, Log, BlockedIP, InvestigationNote
+from .serializers import AlertSerializer, LogSerializer, BlockedIPSerializer, InvestigationNoteSerializer
 
 
 
@@ -139,8 +139,11 @@ def alert_detail(request, pk):
 
     serializer = AlertSerializer(alert, data=request.data, partial=True)
     if serializer.is_valid():
-        serializer.save()
-        return Response(serializer.data)
+        instance = serializer.save()
+        if request.data.get("is_reviewed") is True:
+            instance.status = "resolved"
+            instance.save()
+        return Response(AlertSerializer(instance).data)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -204,15 +207,26 @@ def stats(request):
     ]
 
     # ── Logs per hour (last 24 hours) — useful for timeline chart ──────────────
+    from django.db import connection
     last_24h     = now - datetime.timedelta(hours=24)
-    hourly_logs  = (
-        Log.objects
-        .filter(timestamp__gte=last_24h)
-        .extra(select={"hour": "date_part('hour', timestamp)"})
-        .values("hour")
-        .annotate(count=Count("id"))
-        .order_by("hour")
-    )
+    if connection.vendor == 'sqlite':
+        hourly_logs  = (
+            Log.objects
+            .filter(timestamp__gte=last_24h)
+            .extra(select={"hour": "strftime('%%H', timestamp)"})
+            .values("hour")
+            .annotate(count=Count("id"))
+            .order_by("hour")
+        )
+    else:
+        hourly_logs  = (
+            Log.objects
+            .filter(timestamp__gte=last_24h)
+            .extra(select={"hour": "date_part('hour', timestamp)"})
+            .values("hour")
+            .annotate(count=Count("id"))
+            .order_by("hour")
+        )
 
     return Response({
         "totals": {
@@ -264,4 +278,30 @@ def blocked_ip_delete(request, ip_address):
         return Response({"message": "IP unblocked successfully."}, status=status.HTTP_204_NO_CONTENT)
     except BlockedIP.DoesNotExist:
         return Response({"error": "Blocked IP not found."}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(["GET", "POST"])
+def ip_notes(request):
+    """
+    GET  /api/logs/notes/?ip=<ip>  - get notes for an IP address
+    POST /api/logs/notes/          - save/update notes for an IP address
+    """
+    if request.method == "GET":
+        ip = request.query_params.get("ip")
+        if not ip:
+            return Response({"error": "IP address is required."}, status=status.HTTP_400_BAD_REQUEST)
+        note, created = InvestigationNote.objects.get_or_create(ip_address=ip, defaults={"notes": ""})
+        serializer = InvestigationNoteSerializer(note)
+        return Response(serializer.data)
+
+    elif request.method == "POST":
+        ip = request.data.get("ip_address")
+        notes = request.data.get("notes", "")
+        if not ip:
+            return Response({"error": "ip_address is required."}, status=status.HTTP_400_BAD_REQUEST)
+        note, created = InvestigationNote.objects.get_or_create(ip_address=ip)
+        note.notes = notes
+        note.save()
+        serializer = InvestigationNoteSerializer(note)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

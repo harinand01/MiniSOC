@@ -98,7 +98,7 @@ else:
             'ENGINE': 'django.db.backends.postgresql',
             'NAME': os.getenv('DB_NAME', 'socdb'),
             'USER': os.getenv('DB_USER', 'socuser'),
-            'PASSWORD': os.getenv('DB_PASSWORD', 'socpassword'),
+            'PASSWORD': os.getenv('DB_PASSWORD', 's'),
             'HOST': os.getenv('DB_HOST', 'localhost'),
             'PORT': os.getenv('DB_PORT', '5432'),
         }
@@ -147,6 +147,9 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Rolling window in minutes to calculate login failures
+SOC_ROLLING_WINDOW_MINUTES = 5
 
 # ── Django Channels / WebSocket ────────────────────────────────────────────────
 ASGI_APPLICATION = 'core.asgi.application'
